@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Consolidated Cash Flow Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            min-height: 100vh;
+        }
+        .header {
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            padding: 28px 40px;
+            border-bottom: 1px solid #334155;
+        }
+        .header h1 {
+            font-size: 26px;
+            font-weight: 700;
+            color: #f1f5f9;
+            letter-spacing: -0.5px;
+        }
+        .header p {
+            color: #94a3b8;
+            font-size: 14px;
+            margin-top: 4px;
+        }
+        .dashboard {
+            padding: 24px 40px;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+        /* KPI Cards */
+        .kpi-row {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .kpi-card {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 12px;
+            padding: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+        .kpi-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 3px;
+        }
+        .kpi-card.blue::before { background: #3b82f6; }
+        .kpi-card.green::before { background: #22c55e; }
+        .kpi-card.purple::before { background: #a855f7; }
+        .kpi-card.amber::before { background: #f59e0b; }
+        .kpi-card.cyan::before { background: #06b6d4; }
+        .kpi-label {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #94a3b8;
+            margin-bottom: 8px;
+        }
+        .kpi-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: #f1f5f9;
+        }
+        .kpi-sub {
+            font-size: 12px;
+            margin-top: 6px;
+            color: #64748b;
+        }
+        .kpi-sub.positive { color: #4ade80; }
+        .kpi-sub.negative { color: #f87171; }
+        /* Chart grid */
+        .chart-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 24px;
+        }
+        .chart-card {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 12px;
+            padding: 24px;
+        }
+        .chart-card.full-width {
+            grid-column: 1 / -1;
+        }
+        .chart-card h3 {
+            font-size: 15px;
+            font-weight: 600;
+            color: #f1f5f9;
+            margin-bottom: 16px;
+        }
+        .chart-container {
+            position: relative;
+            height: 300px;
+        }
+        .chart-container.tall {
+            height: 350px;
+        }
+        /* Table */
+        .table-card {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+            overflow-x: auto;
+        }
+        .table-card h3 {
+            font-size: 15px;
+            font-weight: 600;
+            color: #f1f5f9;
+            margin-bottom: 16px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        th {
+            text-align: right;
+            padding: 8px 12px;
+            color: #94a3b8;
+            font-weight: 600;
+            border-bottom: 2px solid #334155;
+            white-space: nowrap;
+        }
+        th:first-child { text-align: left; }
+        td {
+            text-align: right;
+            padding: 7px 12px;
+            border-bottom: 1px solid #1e293b;
+            white-space: nowrap;
+        }
+        td:first-child {
+            text-align: left;
+            color: #cbd5e1;
+            font-weight: 500;
+        }
+        tr:hover td { background: #334155; }
+        tr.section-header td {
+            font-weight: 700;
+            color: #f1f5f9;
+            padding-top: 14px;
+            background: none;
+        }
+        tr.total-row td {
+            font-weight: 700;
+            border-top: 2px solid #475569;
+            color: #f1f5f9;
+        }
+        .pos { color: #4ade80; }
+        .neg { color: #f87171; }
+        .zero { color: #475569; }
+        /* Year filter */
+        .filter-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+        .filter-bar span {
+            font-size: 13px;
+            color: #94a3b8;
+        }
+        .filter-btn {
+            background: #334155;
+            border: 1px solid #475569;
+            color: #e2e8f0;
+            padding: 6px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.15s;
+        }
+        .filter-btn:hover { background: #475569; }
+        .filter-btn.active {
+            background: #3b82f6;
+            border-color: #3b82f6;
+            color: white;
+        }
+        /* Summary boxes */
+        .summary-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .summary-box {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 12px;
+            padding: 20px;
+        }
+        .summary-box h4 {
+            font-size: 13px;
+            color: #94a3b8;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+        .summary-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            font-size: 13px;
+            border-bottom: 1px solid #1e293b44;
+        }
+        .summary-item:last-child { border: none; }
+        .summary-item .label { color: #94a3b8; }
+        .summary-item .val { font-weight: 600; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Monthly Cash Flow Statement &mdash; Consolidated</h1>
+        <p>Jul 2023 &ndash; Mar 2026 &bull; All entities combined</p>
+    </div>
+    <div class="dashboard">
+        <!-- KPIs -->
+        <div class="kpi-row" id="kpiRow"></div>
+
+        <!-- Filters -->
+        <div class="filter-bar">
+            <span>Period:</span>
+            <button class="filter-btn active" data-filter="all">All</button>
+            <button class="filter-btn" data-filter="2023">2023</button>
+            <button class="filter-btn" data-filter="2024">2024</button>
+            <button class="filter-btn" data-filter="2025">2025</button>
+            <button class="filter-btn" data-filter="2026">2026</button>
+        </div>
+
+        <!-- Charts row 1 -->
+        <div class="chart-grid">
+            <div class="chart-card full-width">
+                <h3>Ending Cash Balance Over Time</h3>
+                <div class="chart-container tall"><canvas id="cashBalanceChart"></canvas></div>
+            </div>
+        </div>
+
+        <div class="chart-grid">
+            <div class="chart-card">
+                <h3>Monthly Net Cash Flow (Operating + Investing)</h3>
+                <div class="chart-container"><canvas id="netCashChart"></canvas></div>
+            </div>
+            <div class="chart-card">
+                <h3>Cash In vs Cash Out (Operating)</h3>
+                <div class="chart-container"><canvas id="inOutChart"></canvas></div>
+            </div>
+        </div>
+
+        <div class="chart-grid">
+            <div class="chart-card">
+                <h3>Operating Expense Breakdown (Cumulative)</h3>
+                <div class="chart-container"><canvas id="expenseDonut"></canvas></div>
+            </div>
+            <div class="chart-card">
+                <h3>Annual Summary</h3>
+                <div class="chart-container"><canvas id="annualChart"></canvas></div>
+            </div>
+        </div>
+
+        <!-- Capital summary -->
+        <div class="summary-row">
+            <div class="summary-box">
+                <h4>Capital Overview</h4>
+                <div class="summary-item"><span class="label">Total Capital Raised</span><span class="val pos">$9,150,000</span></div>
+                <div class="summary-item"><span class="label">Capital Deployed</span><span class="val neg">($7,635,085)</span></div>
+                <div class="summary-item"><span class="label">Remaining Capital</span><span class="val">$1,514,915</span></div>
+            </div>
+            <div class="summary-box">
+                <h4>Cash Generation</h4>
+                <div class="summary-item"><span class="label">Total Cash Generated</span><span class="val pos">$933,190</span></div>
+                <div class="summary-item"><span class="label">Ending Cash</span><span class="val">$2,448,105</span></div>
+                <div class="summary-item"><span class="label">Less Remaining Capital</span><span class="val neg">($1,514,915)</span></div>
+            </div>
+            <div class="summary-box">
+                <h4>Latest Month (Mar 2026)</h4>
+                <div class="summary-item"><span class="label">Operating Cash In</span><span class="val pos">$308,795</span></div>
+                <div class="summary-item"><span class="label">Operating Cash Out</span><span class="val neg">($253,593)</span></div>
+                <div class="summary-item"><span class="label">Net Operating CF</span><span class="val pos">$55,202</span></div>
+            </div>
+        </div>
+
+        <!-- Expense breakdown chart (horizontal bar) -->
+        <div class="chart-grid">
+            <div class="chart-card full-width">
+                <h3>Monthly Operating Cash In vs Out with Net Overlay</h3>
+                <div class="chart-container tall"><canvas id="waterfallChart"></canvas></div>
+            </div>
+        </div>
+
+        <!-- Data table -->
+        <div class="table-card">
+            <h3>Annual Cash Flow Summary</h3>
+            <table id="annualTable"></table>
+        </div>
+    </div>
+
+    <script>
+    // === DATA ===
+    const months = ['Jul 23','Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26'];
+
+    const yearMap = ['2023','2023','2023','2023','2023','2024','2024','2024','2024','2024','2024','2024','2024','2024','2024','2024','2024','2025','2025','2025','2025','2025','2025','2025','2025','2025','2025','2025','2025','2026','2026','2026'];
+
+    const beginCash = [0,1,369245,425345.18,406653.46,480112.77,1009724.15,484620.42,497962.49,443199.02,398609.16,374170.31,371213.93,456295.47,508412.86,606737.41,719862.43,909712.16,1133704.34,1267433.34,1440227.01,1478484.58,3295702.12,2722495.22,2353672.22,2252373.52,2233197.09,4829058.85,2438015.03,2453617.65,2516510.75,2392903.03];
+
+    const endCash = [1,369245,425345.18,406653.46,480112.77,1009724.15,484620.42,497962.49,443199.02,398609.16,374170.31,371213.93,456295.47,508412.86,606737.41,719862.43,909712.16,1133704.34,1267433.34,1440227.01,1478484.58,3295702.12,2722495.22,2353672.22,2252373.52,2233197.09,4829058.85,2438015.03,2453617.65,2516510.75,2392903.03,2448104.54];
+
+    const totalCashIn = [0,0,0,11.70,1.34,13.16,24317.86,63109.51,28093.70,30342.55,32117.12,54645.92,41155.87,288149.77,371478.84,360821.27,441117.75,487012.66,426760.52,421406.89,437827.18,413891.23,430732.59,421840.26,448258.08,453985.24,438714.91,455080.32,591722.75,595805.34,540135.86,308794.52];
+
+    const totalCashOut = [1,0,-80904.82,-18703.42,-20292.03,-20401.78,-52023.59,-49767.44,-82857.17,-74932.41,-56555.97,-57602.30,-56074.33,-236032.38,-273154.29,-224161.25,-251268.02,-263020.48,-293031.52,-248613.22,-399569.61,-284173.69,-402473.49,-610663.26,-429556.78,-473161.67,-467853.15,-420939.14,-376120.13,-532912.24,-663743.58,-253593.01];
+
+    const netOperating = [1,0,-80904.82,-18691.72,-20290.69,-20388.62,-27705.73,13342.07,-54763.47,-44589.86,-24438.85,-2956.38,-14918.46,52117.39,98324.55,136660.02,189849.73,223992.18,133729.00,172793.67,38257.57,129717.54,28259.10,-188823.00,18701.30,-19176.43,-29138.24,34141.18,215602.62,62893.10,-123607.72,55201.51];
+
+    const netInvesting = [0,369244,137005,0,93750,550000,-497398,0,0,0,0,0,100000,0,0,-23535,0,0,0,0,0,1687500,-601466,-180000,-120000,0,2625000,-2425185,-200000,0,0,0];
+
+    const netCashChange = [1,369244,56100.18,-18691.72,73459.31,529611.38,-525103.73,13342.07,-54763.47,-44589.86,-24438.85,-2956.38,85081.54,52117.39,98324.55,113125.02,189849.73,223992.18,133729.00,172793.67,38257.57,1817217.54,-573206.90,-368823.00,-101298.70,-19176.43,2595861.76,-2391043.82,15602.62,62893.10,-123607.72,55201.51];
+
+    // Expense categories (absolute values for donut)
+    const expenseCategories = {
+        'Software': [0,0,779.63,89.07,877.18,204.23,-7194.94,7111.42,9026.16,20435.65,5862.39,6572.55,6148.26,85036.31,50728.24,55424.64,29696.21,53939.25,54721.05,42739.24,46356.15,43946.28,48061.07,289298.04,94963.33,140658.59,105335.78,112852.83,73651,167801,137672.49,119860.57],
+        'Contractor': [-1,0,22307.69,17308,16500,17891.20,44002,40199,72139.51,47500,48830,47500,47500,145750,220635.10,166293.88,217341.14,138392.16,146007.67,91896,149230.58,129641.82,121168.39,135747.02,138932.14,116373.81,113111.24,103922.48,98918.82,150075.10,120395.91,2227.51],
+        'Payroll': [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,386.25,39625.65,70644.25,101961.39,104542.95,84533.63,199188.96,173580.25,179724,169160,182456.17,193252,192141,196175.70,362259.70,121030.99],
+        'Professional Fee': [0,0,57817.50,0,1608.50,1000,0,0,0,5094.50,0,714.67,0,4095,0,675,0,14540,1215,6943,0,990,2950,7000,2696,0,315,1176,1575,2772,3316,4674],
+        'Rent': [0,0,0,1306.35,1306.35,1306.35,1306.35,1306.35,1306.35,1306.35,1306.35,1306.35,1306.35,1379.67,1345.54,1345.54,1345.54,1345.54,1345.54,1345.54,1345.54,1345.54,1345.54,1345.54,1345.54,1345.54,1400,1400,1400,1400,1400,1390.99],
+        'Tax': [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,87056,0,16960,0,0,0,0,0,0,0,6419,505],
+        'Royalty': [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,14388,0,0,0,0,0,0,0,38838,49554,0,0,0,0,0],
+        'Other': [0,0,0,0,0,0,3711.30,1150.67,385.15,595.91,557.23,1508.73,1119.72,727.40,445.41,422.19,1500.88,1179.88,17099.01,4188.39,10838.39,23516.42,13803.47,3762.41,11509.73,7619.33,16181.96,8335.83,8434.31,15688.44,33280.48,3904.95],
+    };
+
+    // Annual data
+    const annualLabels = ['2023','2024','2025','2026'];
+    const annualCashIn = [13.04, 1735363.32, 5427232.63, 1444735.72];
+    const annualCashOut = [-119899.27, -1434830.93, -4669176.14, -1450248.83];
+    const annualNetOp = [-119886.23, 300532.39, 758056.49, -5513.11];
+
+    // === HELPERS ===
+    const fmt = (v) => {
+        if (v === 0 || v === undefined || v === null) return '$0';
+        const abs = Math.abs(v);
+        let s;
+        if (abs >= 1e6) s = '$' + (abs/1e6).toFixed(2) + 'M';
+        else if (abs >= 1e3) s = '$' + (abs/1e3).toFixed(0) + 'K';
+        else s = '$' + abs.toFixed(0);
+        return v < 0 ? '(' + s + ')' : s;
+    };
+
+    const fmtFull = (v) => {
+        if (v === 0) return '$0';
+        const neg = v < 0;
+        const s = '$' + Math.abs(v).toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0});
+        return neg ? '(' + s + ')' : s;
+    };
+
+    Chart.defaults.color = '#94a3b8';
+    Chart.defaults.borderColor = '#334155';
+    Chart.defaults.font.family = "'Segoe UI', sans-serif";
+
+    // === KPIs ===
+    const kpiData = [
+        { label: 'Current Cash Balance', value: fmtFull(2448105), sub: 'Mar 2026', cls: 'blue' },
+        { label: 'Total Cash Generated', value: fmtFull(933190), sub: 'Since inception', cls: 'green' },
+        { label: 'Capital Raised', value: fmtFull(9150000), sub: 'Total LP investment', cls: 'purple' },
+        { label: 'Capital Deployed', value: '($7,635,085)', sub: 'Invested in portfolio', cls: 'amber' },
+        { label: 'Remaining Capital', value: fmtFull(1514915), sub: 'Available to deploy', cls: 'cyan' },
+    ];
+
+    const kpiRow = document.getElementById('kpiRow');
+    kpiData.forEach(k => {
+        kpiRow.innerHTML += `<div class="kpi-card ${k.cls}"><div class="kpi-label">${k.label}</div><div class="kpi-value">${k.value}</div><div class="kpi-sub">${k.sub}</div></div>`;
+    });
+
+    // === FILTER STATE ===
+    let activeFilter = 'all';
+    function getFilteredIndices() {
+        if (activeFilter === 'all') return months.map((_, i) => i);
+        return months.map((_, i) => i).filter(i => yearMap[i] === activeFilter);
+    }
+
+    let charts = {};
+
+    function buildCharts() {
+        Object.values(charts).forEach(c => c.destroy());
+        charts = {};
+        const idx = getFilteredIndices();
+        const fMonths = idx.map(i => months[i]);
+
+        // 1. Ending Cash Balance
+        charts.cashBalance = new Chart(document.getElementById('cashBalanceChart'), {
+            type: 'line',
+            data: {
+                labels: fMonths,
+                datasets: [{
+                    label: 'Ending Cash',
+                    data: idx.map(i => endCash[i]),
+                    borderColor: '#3b82f6',
+                    backgroundColor: 'rgba(59,130,246,0.1)',
+                    fill: true,
+                    tension: 0.3,
+                    pointRadius: 3,
+                    pointBackgroundColor: '#3b82f6',
+                    borderWidth: 2,
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { callbacks: { label: ctx => fmt(ctx.raw) } }
+                },
+                scales: {
+                    y: { ticks: { callback: v => fmt(v) }, grid: { color: '#1e293b' } },
+                    x: { ticks: { maxRotation: 45 }, grid: { display: false } }
+                }
+            }
+        });
+
+        // 2. Net Cash Flow bar
+        charts.netCash = new Chart(document.getElementById('netCashChart'), {
+            type: 'bar',
+            data: {
+                labels: fMonths,
+                datasets: [{
+                    label: 'Net Cash Change',
+                    data: idx.map(i => netCashChange[i]),
+                    backgroundColor: idx.map(i => netCashChange[i] >= 0 ? 'rgba(34,197,94,0.7)' : 'rgba(248,113,113,0.7)'),
+                    borderColor: idx.map(i => netCashChange[i] >= 0 ? '#22c55e' : '#f87171'),
+                    borderWidth: 1,
+                    borderRadius: 3,
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { callbacks: { label: ctx => fmt(ctx.raw) } }
+                },
+                scales: {
+                    y: { ticks: { callback: v => fmt(v) }, grid: { color: '#1e293b' } },
+                    x: { ticks: { maxRotation: 45, font: { size: 10 } }, grid: { display: false } }
+                }
+            }
+        });
+
+        // 3. Cash In vs Out
+        charts.inOut = new Chart(document.getElementById('inOutChart'), {
+            type: 'bar',
+            data: {
+                labels: fMonths,
+                datasets: [
+                    {
+                        label: 'Cash In',
+                        data: idx.map(i => totalCashIn[i]),
+                        backgroundColor: 'rgba(34,197,94,0.6)',
+                        borderColor: '#22c55e',
+                        borderWidth: 1,
+                        borderRadius: 2,
+                    },
+                    {
+                        label: 'Cash Out',
+                        data: idx.map(i => Math.abs(totalCashOut[i])),
+                        backgroundColor: 'rgba(248,113,113,0.6)',
+                        borderColor: '#f87171',
+                        borderWidth: 1,
+                        borderRadius: 2,
+                    }
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'top', labels: { boxWidth: 12, padding: 12 } },
+                    tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + fmt(ctx.raw) } }
+                },
+                scales: {
+                    y: { ticks: { callback: v => fmt(v) }, grid: { color: '#1e293b' } },
+                    x: { ticks: { maxRotation: 45, font: { size: 10 } }, grid: { display: false } }
+                }
+            }
+        });
+
+        // 4. Expense Donut
+        const expTotals = {};
+        for (const [cat, vals] of Object.entries(expenseCategories)) {
+            expTotals[cat] = idx.reduce((s, i) => s + Math.max(0, vals[i]), 0);
+        }
+        const donutLabels = Object.keys(expTotals).filter(k => expTotals[k] > 0);
+        const donutVals = donutLabels.map(k => expTotals[k]);
+        const donutColors = ['#3b82f6','#f59e0b','#22c55e','#a855f7','#06b6d4','#ef4444','#ec4899','#64748b'];
+
+        charts.donut = new Chart(document.getElementById('expenseDonut'), {
+            type: 'doughnut',
+            data: {
+                labels: donutLabels,
+                datasets: [{
+                    data: donutVals,
+                    backgroundColor: donutColors.slice(0, donutLabels.length),
+                    borderColor: '#1e293b',
+                    borderWidth: 2,
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                cutout: '55%',
+                plugins: {
+                    legend: { position: 'right', labels: { boxWidth: 12, padding: 8, font: { size: 11 } } },
+                    tooltip: { callbacks: { label: ctx => ctx.label + ': ' + fmt(ctx.raw) + ' (' + ((ctx.raw / donutVals.reduce((a,b)=>a+b,0))*100).toFixed(1) + '%)' } }
+                }
+            }
+        });
+
+        // 5. Annual summary
+        charts.annual = new Chart(document.getElementById('annualChart'), {
+            type: 'bar',
+            data: {
+                labels: annualLabels,
+                datasets: [
+                    {
+                        label: 'Cash In',
+                        data: annualCashIn,
+                        backgroundColor: 'rgba(34,197,94,0.7)',
+                        borderRadius: 4,
+                    },
+                    {
+                        label: 'Cash Out',
+                        data: annualCashOut.map(Math.abs),
+                        backgroundColor: 'rgba(248,113,113,0.7)',
+                        borderRadius: 4,
+                    },
+                    {
+                        label: 'Net Operating CF',
+                        data: annualNetOp,
+                        type: 'line',
+                        borderColor: '#f59e0b',
+                        backgroundColor: '#f59e0b',
+                        pointRadius: 5,
+                        pointStyle: 'rectRounded',
+                        borderWidth: 2,
+                        tension: 0.2,
+                        yAxisID: 'y',
+                    }
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'top', labels: { boxWidth: 12, padding: 12 } },
+                    tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + fmt(ctx.raw) } }
+                },
+                scales: {
+                    y: { ticks: { callback: v => fmt(v) }, grid: { color: '#1e293b' } },
+                    x: { grid: { display: false } }
+                }
+            }
+        });
+
+        // 6. Waterfall / combined chart
+        charts.waterfall = new Chart(document.getElementById('waterfallChart'), {
+            type: 'bar',
+            data: {
+                labels: fMonths,
+                datasets: [
+                    {
+                        label: 'Cash In',
+                        data: idx.map(i => totalCashIn[i]),
+                        backgroundColor: 'rgba(34,197,94,0.65)',
+                        borderRadius: 2,
+                        stack: 'stack0',
+                    },
+                    {
+                        label: 'Cash Out',
+                        data: idx.map(i => totalCashOut[i]),
+                        backgroundColor: 'rgba(248,113,113,0.65)',
+                        borderRadius: 2,
+                        stack: 'stack0',
+                    },
+                    {
+                        label: 'Net Operating CF',
+                        data: idx.map(i => netOperating[i]),
+                        type: 'line',
+                        borderColor: '#f59e0b',
+                        backgroundColor: 'transparent',
+                        pointRadius: 3,
+                        borderWidth: 2,
+                        tension: 0.3,
+                    }
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'top', labels: { boxWidth: 12, padding: 12 } },
+                    tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + fmt(ctx.raw) } }
+                },
+                scales: {
+                    y: { stacked: true, ticks: { callback: v => fmt(v) }, grid: { color: '#1e293b' } },
+                    x: { stacked: true, ticks: { maxRotation: 45, font: { size: 10 } }, grid: { display: false } }
+                }
+            }
+        });
+    }
+
+    buildCharts();
+
+    // Filter buttons
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            activeFilter = btn.dataset.filter;
+            buildCharts();
+        });
+    });
+
+    // === ANNUAL TABLE ===
+    const tableRows = [
+        { label: 'Income', vals: [0, 1732491.90, 5413764.19, 1440042.72] },
+        { label: 'Other Income', vals: [13.04, 2871.42, 13468.44, 4693.00] },
+        { label: 'Total Cash In', vals: [13.04, 1735363.32, 5427232.63, 1444735.72], total: true },
+        { label: '', vals: [] },
+        { label: 'Software', vals: [-1745.88, -269051.12, -1106522.61, -425334.06] },
+        { label: 'Contractor', vals: [-56114.69, -1115581.83, -1483342.13, -272698.52] },
+        { label: 'Payroll', vals: [0, -386.25, -1690810.25, -679466.39] },
+        { label: 'Professional Fee', vals: [-59426.00, -11579.17, -39400.00, -10762.00] },
+        { label: 'Insurance', vals: [0, -13610.18, -14523.14, -15135.79] },
+        { label: 'Rent', vals: [-2612.70, -15867.09, -16309.86, -4190.99] },
+        { label: 'Tax', vals: [0, 0, -104016.00, -6924.00] },
+        { label: 'Royalty', vals: [0, 0, -102780.00, 0] },
+        { label: 'Other Expenses', vals: [0, -8755.29, -111472.15, -35736.08] },
+        { label: 'Total Cash Out', vals: [-119899.27, -1434830.93, -4669176.14, -1450248.83], total: true },
+        { label: '', vals: [] },
+        { label: 'Net Operating Cash Flow', vals: [-119886.23, 300532.39, 758056.49, -5513.11], total: true },
+    ];
+
+    const table = document.getElementById('annualTable');
+    let html = '<thead><tr><th>Category</th><th>2023</th><th>2024</th><th>2025</th><th>2026 YTD</th></tr></thead><tbody>';
+    tableRows.forEach(r => {
+        if (!r.label && r.vals.length === 0) {
+            html += '<tr><td colspan="5" style="height:8px;border:none"></td></tr>';
+            return;
+        }
+        const cls = r.total ? ' class="total-row"' : '';
+        html += `<tr${cls}><td>${r.label}</td>`;
+        r.vals.forEach(v => {
+            const c = v > 0 ? 'pos' : v < 0 ? 'neg' : 'zero';
+            html += `<td class="${c}">${fmtFull(v)}</td>`;
+        });
+        html += '</tr>';
+    });
+    html += '</tbody>';
+    table.innerHTML = html;
+    </script>
+</body>
+</html>
