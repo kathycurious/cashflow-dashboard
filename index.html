@@ -13,6 +13,62 @@
             color: #e2e8f0;
             min-height: 100vh;
         }
+        /* Password overlay */
+        #lockScreen {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: #0f172a;
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .lock-box {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 16px;
+            padding: 40px 48px;
+            text-align: center;
+            width: 400px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        }
+        .lock-box .lock-icon { font-size: 40px; margin-bottom: 16px; }
+        .lock-box h2 { font-size: 20px; color: #f1f5f9; margin-bottom: 6px; }
+        .lock-box p { font-size: 13px; color: #94a3b8; margin-bottom: 24px; }
+        .lock-box input {
+            width: 100%;
+            padding: 12px 16px;
+            background: #0f172a;
+            border: 1px solid #475569;
+            border-radius: 8px;
+            color: #f1f5f9;
+            font-size: 15px;
+            outline: none;
+            margin-bottom: 16px;
+            text-align: center;
+            letter-spacing: 2px;
+        }
+        .lock-box input:focus { border-color: #3b82f6; }
+        .lock-box button {
+            width: 100%;
+            padding: 12px;
+            background: #3b82f6;
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .lock-box button:hover { background: #2563eb; }
+        .lock-error {
+            color: #f87171;
+            font-size: 13px;
+            margin-top: 12px;
+            display: none;
+        }
+        #dashboardContent { display: none; }
         .header {
             background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
             padding: 28px 40px;
@@ -223,6 +279,19 @@
     </style>
 </head>
 <body>
+    <!-- Password Screen -->
+    <div id="lockScreen">
+        <div class="lock-box">
+            <div class="lock-icon">&#128274;</div>
+            <h2>Cash Flow Dashboard</h2>
+            <p>Enter the password to access this dashboard</p>
+            <input type="password" id="pwdInput" placeholder="Enter password" autofocus onkeydown="if(event.key==='Enter')unlock()">
+            <button onclick="unlock()">Unlock</button>
+            <div class="lock-error" id="pwdError">Incorrect password. Please try again.</div>
+        </div>
+    </div>
+
+    <div id="dashboardContent">
     <div class="header">
         <h1>Monthly Cash Flow Statement &mdash; Consolidated</h1>
         <p>Jul 2023 &ndash; Mar 2026 &bull; All entities combined</p>
@@ -661,6 +730,38 @@
     });
     html += '</tbody>';
     table.innerHTML = html;
+    </script>
+
+    </div><!-- end dashboardContent -->
+
+    <script>
+    // Password: "curious2026" — hashed with SHA-256
+    const PASS_HASH = '0c576d45978b95f6c865a03846b686e9c5c6f95398f394beb3f282e4ee1ae1f3';
+
+    async function sha256(msg) {
+        const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(msg));
+        return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+    }
+
+    async function unlock() {
+        const pwd = document.getElementById('pwdInput').value;
+        const hash = await sha256(pwd);
+        if (hash === PASS_HASH) {
+            document.getElementById('lockScreen').style.display = 'none';
+            document.getElementById('dashboardContent').style.display = 'block';
+            sessionStorage.setItem('cf_auth', 'true');
+        } else {
+            document.getElementById('pwdError').style.display = 'block';
+            document.getElementById('pwdInput').value = '';
+            document.getElementById('pwdInput').focus();
+        }
+    }
+
+    // Stay unlocked during the session
+    if (sessionStorage.getItem('cf_auth') === 'true') {
+        document.getElementById('lockScreen').style.display = 'none';
+        document.getElementById('dashboardContent').style.display = 'block';
+    }
     </script>
 </body>
 </html>
